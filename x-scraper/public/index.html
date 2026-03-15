@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>X.com Guest Scraper</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>X.com Scraper <span class="badge">Guest Mode</span></h1>
+            <p>Scrape "Latest" results using proxy rotation (Best Effort)</p>
+        </header>
+
+        <main>
+            <div class="search-box">
+                <input type="text" id="keyword" placeholder="Enter keyword to search (e.g. 'AI', 'crypto')" />
+                <button id="scrapeBtn">Scrape</button>
+            </div>
+
+            <div class="status-panel">
+                <h3>Status Log</h3>
+                <div id="logs" class="logs-container"></div>
+            </div>
+
+            <div class="results-panel">
+                <h3>Results <span id="resultCount">(0)</span></h3>
+                <div id="results" class="results-grid"></div>
+            </div>
+        </main>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

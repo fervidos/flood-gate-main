@@ -1,0 +1,18 @@
+{
+    "name": "x-scraper-dashboard",
+    "version": "1.0.0",
+    "description": "A dashboard for scraping X.com guest results using proxies",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js"
+    },
+    "dependencies": {
+        "body-parser": "^1.20.2",
+        "cors": "^2.8.5",
+        "express": "^4.18.2",
+        "puppeteer": "^21.5.0",
+        "puppeteer-extra": "^3.3.6",
+        "puppeteer-extra-plugin-stealth": "^2.11.2",
+        "socket.io": "^4.7.2"
+    }
+}

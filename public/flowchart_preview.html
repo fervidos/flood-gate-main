@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flowchart Preview</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            background-color: #ffffff;
+            font-family: sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .mermaid {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="mermaid">
+graph TD
+    %% Nodes
+    User([User / Discord Command])
+    API[API Endpoint / Bot Command]
+    AS[Attack Service]
+    
+    subgraph "Attack Orchestration"
+        Session[Create Attack Session]
+        Loop{Attack Loop}
+        RateLimit[Rate Limiter / Pacer]
+    end
+
+    subgraph "Identity Fabrication (Per Request)"
+        NGL[NGL Service]
+        GenID[Generate Unique Device ID]
+        GenUA[Select Random User-Agent]
+        GenHeaders[Generate Realistic Headers]
+        GenRef[Select Random Referer]
+    end
+
+    subgraph "Network Routing"
+        PS[Proxy Service]
+        PSelect{Select Proxy}
+        PL[(Proxy List)]
+        PAgent[Create Proxy Agent]
+    end
+
+    subgraph "Execution"
+        ReqBuild[Request Builder]
+        Axios[Axios HTTP Client]
+        Retry{Retry Logic}
+    end
+
+    subgraph "External Network"
+        ProxyNode[Proxy Server]
+        Target[NGL.link API]
+    end
+
+    subgraph "Analytics"
+        Stats[Stats Service]
+        DB[(Database)]
+    end
+
+    %% Flow
+    User -->|Initiates Attack| API
+    API -->|Start Spam/Bomb| AS
+    AS --> Session
+    Session --> Loop
+    Loop --> RateLimit
+    RateLimit -->|Next Message| NGL
+
+    %% Identity Gen
+    NGL --> GenID
+    NGL --> GenUA
+    GenUA --> GenHeaders
+    GenRef --> GenHeaders
+    
+    %% Proxy Selection
+    NGL --> PS
+    PS --> PSelect
+    PL --> PSelect
+    PSelect -->|Get High-Performance Proxy| PAgent
+    
+    %% Request Building
+    GenID --> ReqBuild
+    GenHeaders --> ReqBuild
+    PAgent --> ReqBuild
+    ReqBuild -->|Construct Request| Axios
+
+    %% Network Request
+    Axios -->|Forward Request| ProxyNode
+    ProxyNode -->|Spoofed Request| Target
+    Target -->|Response| ProxyNode
+    ProxyNode -->|Response| Axios
+
+    %% Response Handling
+    Axios -->|Result| Retry
+    Retry -->|"Success (200)"| Stats
+    Retry -->|"Failure and Retries lt Max"| NGL
+    Retry -->|"Failure and Retries Exceeded"| Stats
+
+    %% Stats
+    Stats -->|Log Result| DB
+    Stats -->|Update Live Dashboard| User
+    </div>
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+</body>
+</html>

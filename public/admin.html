@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FloodGate // DB Admin</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Inline styles for admin-specific table layout not covered in main css -->
+    <style>
+        .table-results {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+            font-size: 0.9em;
+        }
+
+        .table-results th,
+        .table-results td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border-subtle);
+            text-align: left;
+        }
+
+        .table-results th {
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .table-results tr:hover {
+            background: var(--bg-hover);
+        }
+
+        .db-table-item {
+            padding: 10px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+            transition: all 0.2s;
+        }
+
+        .db-table-item:hover {
+            background: var(--bg-hover);
+            color: var(--text-main);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="app-container">
+        <!-- Reusing Sidebar Structure -->
+        <nav class="sidebar">
+            <div class="brand-logo">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                </svg>
+            </div>
+
+            <div class="nav-links">
+                <a href="index.html" class="nav-item">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="14" width="7" height="7"></rect>
+                        <rect x="3" y="14" width="7" height="7"></rect>
+                    </svg>
+                    <span class="nav-tooltip">Dashboard</span>
+                </a>
+
+                <a href="proxies.html" class="nav-item">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M2 12h20"></path>
+                        <path d="M2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6"></path>
+                        <path d="M2 12V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v6"></path>
+                        <path d="M12 2v20"></path>
+                    </svg>
+                    <span class="nav-tooltip">Proxies</span>
+                </a>
+
+                <a href="admin.html" class="nav-item active">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2.69l5.74 5.88-5.74 5.88-5.74-5.88z"></path>
+                        <path d="M7.74 14.47l-5.74 5.88 5.74 5.88 5.74-5.88z"></path>
+                        <path d="M16.26 14.47l-5.74 5.88 5.74 5.88 5.74-5.88z"></path>
+                    </svg>
+                    <span class="nav-tooltip">Admin</span>
+                </a>
+            </div>
+        </nav>
+
+        <main class="main-content">
+            <header class="top-header">
+                <div class="page-title">
+                    <h1>Database Administration</h1>
+                </div>
+                <div class="header-stats">
+                    <div class="stat-pill">
+                        <span class="status-dot"></span>
+                        <span>Admin Mode</span>
+                    </div>
+                </div>
+            </header>
+
+            <div class="dashboard-view" style="display:flex; gap:24px; padding:32px;">
+                <!-- Sidebar for Tables -->
+                <div class="card" style="width: 250px; height: fit-content; min-height: 400px;">
+                    <h3 style="font-size:14px; color:var(--text-muted); margin-bottom:16px;">Tables</h3>
+                    <ul id="table-list" style="list-style:none;">
+                        <!-- Injected by JS -->
+                    </ul>
+                </div>
+
+                <!-- Main Query Area -->
+                <div style="flex:1; display:flex; flex-direction:column; gap:24px;">
+
+                    <div class="card">
+                        <h3 style="font-size:14px; color:var(--text-muted); margin-bottom:12px;">SQL Query Editor</h3>
+                        <textarea id="query-editor" class="input-field"
+                            style="font-family: 'JetBrains Mono', monospace; height: 120px; font-size:14px;"
+                            placeholder="SELECT * FROM users..."></textarea>
+
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px;">
+                            <span style="font-size:12px; color:var(--text-muted);">Ctrl+Enter to Execute</span>
+                            <button id="run-query-btn" class="btn btn-primary">Run Query</button>
+                        </div>
+                        <div id="error-msg" class="text-danger" style="margin-top:12px; font-size:13px; display:none">
+                        </div>
+                    </div>
+
+                    <div class="card"
+                        style="flex:1; min-height:400px; overflow:hidden; display:flex; flex-direction:column;">
+                        <h3 style="font-size:14px; color:var(--text-muted); margin-bottom:16px;">Results</h3>
+                        <div style="flex:1; overflow:auto;">
+                            <table id="results-table" class="table-results">
+                                <thead></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="bg.js"></script>
+    <script src="admin.js"></script>
+    <!-- Update admin.js to handle list item class names for better styling if needed -->
+    <!-- But actually admin.js just creates <li>. I added styling for <li> in <style> block implicitly? No, I need to check admin.js creation -->
+    <script>
+        // Monkey-patching admin.js behavior for styling by observing?
+        // Or better, just style `#table-list li` in the <style> block above.
+        // I did add .db-table-item in CSS but need to apply it.
+        // admin.js creates plain `li`. I can target `#table-list li` in CSS.
+    </script>
+    <style>
+        #table-list li {
+            padding: 10px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+            transition: all 0.2s;
+        }
+
+        #table-list li:hover {
+            background: var(--bg-hover);
+            color: var(--text-main);
+        }
+    </style>
+</body>
+
+</html>
