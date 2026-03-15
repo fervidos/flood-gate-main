@@ -6,6 +6,8 @@
     --bg-panel: #0e0e11;
     --bg-card: #131316;
     --bg-hover: #1c1c21;
+    --bg-link: #1c1c21;
+    --bg-secondary: #17171b;
 
     --border-subtle: #27272a;
     --border-light: #3f3f46;
@@ -20,11 +22,16 @@
     --accent-green: #10b981;
     --accent-red: #ef4444;
     --accent-orange: #f97316;
+    --accent-green-rgb: 16, 185, 129;
+    --accent-red-rgb: 239, 68, 68;
+    --green: #10b981;
+    --orange: #f97316;
 
     /* Text */
     --text-main: #fafafa;
     --text-muted: #a1a1aa;
     --text-faint: #52525b;
+    --text-danger: #ef4444;
 
     /* Spacing & Radius */
     --radius-sm: 6px;
@@ -61,6 +68,7 @@ body {
     font-family: 'Outfit', sans-serif;
     height: 100vh;
     overflow: hidden;
+    overflow-x: hidden;
     line-height: 1.5;
 }
 
@@ -263,6 +271,16 @@ body {
 
 .btn-danger:hover {
     background: rgba(239, 68, 68, 0.2);
+}
+
+.btn-secondary {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-main);
+}
+
+.btn-secondary:hover {
+    background: var(--bg-hover);
 }
 
 /* --- Dashboard Grid --- */
@@ -551,6 +569,64 @@ body {
     gap: 12px;
 }
 
+/* In-app notifications and confirmations */
+.ux-toast-host {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1200;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+}
+
+.ux-toast {
+    min-width: 240px;
+    max-width: 360px;
+    border-radius: 12px;
+    padding: 10px 14px;
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-panel);
+    color: var(--text-main);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    transform: translateY(-8px);
+    opacity: 0;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.ux-toast.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.ux-toast-success {
+    border-color: rgba(var(--accent-green-rgb), 0.5);
+}
+
+.ux-toast-error {
+    border-color: rgba(var(--accent-red-rgb), 0.5);
+}
+
+.ux-toast-info {
+    border-color: rgba(99, 102, 241, 0.5);
+}
+
+.ux-confirm-overlay {
+    z-index: 1300;
+}
+
+.ux-confirm-text {
+    color: var(--text-muted);
+    margin-bottom: 20px;
+}
+
+.ux-confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
 
 
 /* Animations */
@@ -589,6 +665,223 @@ body {
     color: var(--accent-cyan);
 }
 
+.text-muted {
+    color: var(--text-muted);
+}
+
 .glow-success {
     box-shadow: 0 0 10px rgba(16, 185, 129, 0.2);
+}
+
+/* Responsive layout tuning */
+@media (max-width: 1280px) {
+    .top-header {
+        padding: 0 20px;
+    }
+
+    .header-stats {
+        gap: 12px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+
+    .dashboard-view {
+        padding: 24px;
+    }
+
+    .grid-layout {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+    }
+
+    .chart-card {
+        grid-column: span 2;
+        height: 320px;
+    }
+
+    .metrics-stack {
+        grid-column: span 2;
+        height: auto;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+    }
+}
+
+@media (max-width: 980px) {
+    body {
+        height: auto;
+        min-height: 100vh;
+        overflow-y: auto;
+    }
+
+    .app-container {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+        height: auto;
+        min-height: 100vh;
+    }
+
+    .sidebar {
+        border-right: none;
+        border-bottom: 1px solid var(--border-subtle);
+        padding: 12px 16px;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+        position: sticky;
+        top: 0;
+        background: rgba(14, 14, 17, 0.95);
+        backdrop-filter: blur(10px);
+    }
+
+    .brand-logo {
+        margin-bottom: 0;
+        width: 38px;
+        height: 38px;
+    }
+
+    .nav-links {
+        flex-direction: row;
+        width: auto;
+        gap: 8px;
+    }
+
+    .nav-item {
+        width: 42px;
+        height: 42px;
+    }
+
+    .nav-item.active::before,
+    .nav-tooltip {
+        display: none;
+    }
+
+    .main-content {
+        overflow: visible;
+    }
+
+    .top-header {
+        min-height: 72px;
+        height: auto;
+        padding: 12px 16px;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: flex-start;
+    }
+
+    .page-title h1 {
+        font-size: 20px;
+    }
+
+    .header-stats {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .stat-pill {
+        padding: 6px 12px;
+        font-size: 12px;
+    }
+
+    .btn {
+        padding: 9px 14px;
+        font-size: 13px;
+    }
+
+    .dashboard-view {
+        height: auto;
+        overflow: visible;
+        padding: 16px;
+    }
+
+    .grid-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .chart-card,
+    .metrics-stack {
+        grid-column: span 1;
+    }
+
+    .chart-card {
+        height: 280px;
+    }
+
+    .metrics-stack {
+        grid-template-columns: 1fr;
+        display: grid;
+        gap: 12px;
+    }
+
+    .metric-card {
+        min-height: 92px;
+    }
+
+    .modal-content {
+        width: calc(100% - 24px);
+        max-width: 100%;
+        padding: 20px;
+        border-radius: 16px;
+    }
+
+    .modal-content.lg {
+        height: 92vh;
+    }
+
+    .split-layout {
+        flex-direction: column;
+    }
+
+    .sidebar-list {
+        width: 100%;
+        max-height: 38vh;
+        border-right: none;
+        border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .details-panel {
+        min-height: 0;
+    }
+
+    .message-feed,
+    .details-header {
+        padding: 14px;
+    }
+}
+
+@media (max-width: 600px) {
+    .top-header {
+        padding: 10px 12px;
+    }
+
+    .dashboard-view {
+        padding: 12px;
+    }
+
+    .card,
+    .metric-card {
+        padding: 14px;
+        border-radius: 16px;
+    }
+
+    .chart-value {
+        font-size: 24px;
+    }
+
+    .modal-content {
+        width: calc(100% - 16px);
+        padding: 16px;
+    }
+
+    .ux-toast-host {
+        top: 12px;
+        right: 10px;
+        left: 10px;
+    }
+
+    .ux-toast {
+        min-width: 0;
+        max-width: 100%;
+    }
 }

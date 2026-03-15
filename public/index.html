@@ -89,10 +89,10 @@
                         <span id="uptime">00:00:00</span>
                     </div>
 
-                    <div class="stat-pill status-badge" style="border: none; background: transparent; padding: 0;">
+                    <div class="stat-pill status-badge connection-pill">
                         <!-- JS updates this class/content for Online/Offline status -->
                         <!-- Keeping the status-badge class for JS compatibility, but I might need to style it -->
-                        <span class="status-text" style="display:none">Online</span>
+                        <span class="status-text is-hidden">Online</span>
                     </div>
 
                     <div class="stat-pill" title="Network Load">
@@ -101,13 +101,11 @@
                             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
                         </svg>
                         <span id="bandwidth-total">0 MB</span>
-                        <span id="bandwidth-upload"
-                            style="font-size: 10px; color: var(--text-faint); margin-left: 5px;">0</span>
-                        <span id="bandwidth-download"
-                            style="font-size: 10px; color: var(--text-faint); margin-left: 5px;">0</span>
+                        <span id="bandwidth-upload" class="bandwidth-rate">0</span>
+                        <span id="bandwidth-download" class="bandwidth-rate">0</span>
                     </div>
 
-                    <div style="display: flex; gap: 12px; margin-left: 12px;">
+                    <div class="header-actions">
                         <button id="btn-stop-all" class="btn btn-danger">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -196,17 +194,15 @@
                     <div class="card metric-card">
                         <div class="metric-label">Available Proxies</div>
                         <div class="metric-value" id="proxy-count">0</div>
-                        <div id="proxy-status" style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Ready
+                        <div id="proxy-status" class="proxy-status-line">Ready
                         </div>
                     </div>
 
-                    <div class="card metric-card" style="flex-direction: column; gap: 8px; align-items: stretch; justify-content: center;">
-                        <button id="btn-fetch-proxies" class="btn"
-                            style="background: var(--bg-hover); border: 1px solid var(--border-subtle); width: 100%;">
+                    <div class="card metric-card proxy-actions-card">
+                        <button id="btn-fetch-proxies" class="btn btn-secondary btn-block">
                             Pull New Proxies
                         </button>
-                        <button id="btn-refresh-proxies" class="btn"
-                            style="background: var(--bg-hover); border: 1px solid var(--border-subtle); width: 100%;">
+                        <button id="btn-refresh-proxies" class="btn btn-secondary btn-block">
                             Refresh Counter
                         </button>
                     </div>
@@ -227,16 +223,22 @@
                 <div class="form-group">
                     <label>Target Username / URL</label>
                     <input type="text" id="target-input" class="input-field" placeholder="e.g. username" required>
+                    <div class="input-help">Use a username or profile URL. Example: user123 or https://example.com/user123</div>
+                    <div id="target-error" class="field-error"></div>
                 </div>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="form-grid-2">
                     <div class="form-group">
                         <label>RPS Limit</label>
                         <input type="number" id="rps-input" class="input-field" value="50" min="1" max="500">
+                        <div class="input-help">Recommended: 20-120 for stable throughput.</div>
+                        <div id="rps-error" class="field-error"></div>
                     </div>
                     <div class="form-group">
                         <label>Duration (Seconds)</label>
                         <input type="number" id="duration-input" class="input-field" value="60" min="10" max="3600">
+                        <div class="input-help">Allowed range: 10 to 3600 seconds.</div>
+                        <div id="duration-error" class="field-error"></div>
                     </div>
                 </div>
 
@@ -244,10 +246,11 @@
                     <label>Message Content (Split by |)</label>
                     <textarea id="message-input" class="input-field" rows="4"
                         placeholder="spam test | hello world"></textarea>
+                    <div class="input-help">Enter at least one message. Use | to rotate multiple messages.</div>
+                    <div id="message-error" class="field-error"></div>
                 </div>
 
-                <button type="submit" id="btn-launch" class="btn btn-primary"
-                    style="width: 100%; justify-content: center; margin-top: 12px;">
+                <button type="submit" id="btn-launch" class="btn btn-primary btn-full">
                     Initialize Attack Sequence
                 </button>
             </form>
@@ -276,12 +279,12 @@
                 <!-- Main Details -->
                 <div class="details-panel">
                     <div class="details-header">
-                        <h2 id="selected-victim-name" style="font-size: 18px; margin-bottom: 0;">Select a victim</h2>
+                        <h2 id="selected-victim-name" class="details-title">Select a victim</h2>
                         <!-- Dynamic Header Content injected here by existing JS logic -->
                         <!-- We need to ensure the JS finds 'v-header-container' if it tries to inject -->
                     </div>
 
-                    <div id="victim-messages" style="display: flex; flex-direction: column; height: 100%;">
+                    <div id="victim-messages" class="victim-messages-layout">
                         <!-- Need container for messages that matches JS expectations -->
                         <!-- JS uses 'message-list' ul -->
                         <ul id="message-list" class="message-feed">
@@ -289,15 +292,12 @@
                         </ul>
 
                         <!-- Note input from original design, assuming functionality needed -->
-                        <div style="padding: 16px; border-top: 1px solid var(--border-subtle);">
-                            <div style="display: flex; gap: 8px;">
-                                <input id="victim-note" class="input-field" placeholder="Add note..."
-                                    style="font-size: 12px;">
-                                <button id="save-note-btn" class="btn btn-primary"
-                                    style="padding: 8px 16px;">Save</button>
+                        <div class="victim-note-wrap">
+                            <div class="victim-note-row">
+                                <input id="victim-note" class="input-field victim-note-input" placeholder="Add note...">
+                                <button id="save-note-btn" class="btn btn-primary victim-note-btn">Save</button>
                             </div>
-                            <span id="note-save-status"
-                                style="font-size: 11px; margin-top: 4px; display: block;"></span>
+                            <span id="note-save-status" class="note-save-status"></span>
                         </div>
                     </div>
 

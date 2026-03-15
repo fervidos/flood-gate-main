@@ -1,4 +1,102 @@
 document.addEventListener('DOMContentLoaded', () => {
+    function ensureUxElements() {
+        let toastHost = document.getElementById('ux-toast-host');
+        if (!toastHost) {
+            toastHost = document.createElement('div');
+            toastHost.id = 'ux-toast-host';
+            toastHost.className = 'ux-toast-host';
+            document.body.appendChild(toastHost);
+        }
+
+        let confirmOverlay = document.getElementById('ux-confirm-overlay');
+        if (!confirmOverlay) {
+            confirmOverlay = document.createElement('div');
+            confirmOverlay.id = 'ux-confirm-overlay';
+            confirmOverlay.className = 'modal-overlay ux-confirm-overlay';
+            confirmOverlay.innerHTML = `
+                <div class="modal-content" style="max-width: 420px;">
+                    <div class="modal-header">
+                        <h3 id="ux-confirm-title">Confirm Action</h3>
+                    </div>
+                    <p id="ux-confirm-message" class="ux-confirm-text"></p>
+                    <div class="ux-confirm-actions">
+                        <button id="ux-confirm-cancel" class="btn btn-secondary">Cancel</button>
+                        <button id="ux-confirm-ok" class="btn btn-primary">Confirm</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(confirmOverlay);
+        }
+    }
+
+    function showToast(message, type = 'info', timeout = 2400) {
+        ensureUxElements();
+        const toastHost = document.getElementById('ux-toast-host');
+        const toast = document.createElement('div');
+        toast.className = `ux-toast ux-toast-${type}`;
+        toast.textContent = message;
+        toastHost.appendChild(toast);
+
+        requestAnimationFrame(() => {
+            toast.classList.add('visible');
+        });
+
+        window.setTimeout(() => {
+            toast.classList.remove('visible');
+            window.setTimeout(() => toast.remove(), 200);
+        }, timeout);
+    }
+
+    function showConfirm(message, options = {}) {
+        ensureUxElements();
+        const {
+            title = 'Confirm Action',
+            confirmText = 'Confirm',
+            cancelText = 'Cancel',
+            danger = false
+        } = options;
+
+        const overlay = document.getElementById('ux-confirm-overlay');
+        const titleEl = document.getElementById('ux-confirm-title');
+        const messageEl = document.getElementById('ux-confirm-message');
+        const okBtn = document.getElementById('ux-confirm-ok');
+        const cancelBtn = document.getElementById('ux-confirm-cancel');
+
+        titleEl.textContent = title;
+        messageEl.textContent = message;
+        okBtn.textContent = confirmText;
+        cancelBtn.textContent = cancelText;
+        okBtn.className = danger ? 'btn btn-danger' : 'btn btn-primary';
+
+        overlay.style.display = 'flex';
+
+        return new Promise((resolve) => {
+            const cleanup = () => {
+                overlay.style.display = 'none';
+                okBtn.onclick = null;
+                cancelBtn.onclick = null;
+                overlay.onclick = null;
+            };
+
+            okBtn.onclick = () => {
+                cleanup();
+                resolve(true);
+            };
+
+            cancelBtn.onclick = () => {
+                cleanup();
+                resolve(false);
+            };
+
+            overlay.onclick = (event) => {
+                if (event.target === overlay) {
+                    cleanup();
+                    resolve(false);
+                }
+            };
+        });
+    }
+
     const proxyList = document.getElementById('proxy-list');
     const pagination = document.getElementById('pagination');
     const searchInput = document.getElementById('search-input');
@@ -54,25 +152,31 @@ document.addEventListener('DOMContentLoaded', () => {
     btnDeleteSelected.addEventListener('click', async () => {
         if (selectedProxies.size === 0) return;
         
-        if (confirm(`Are you sure you want to delete ${selectedProxies.size} proxies?`)) {
-            try {
-                const response = await fetch('/api/proxies/manage', {
-                    method: 'DELETE',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ids: Array.from(selectedProxies) })
-                });
-                
-                if (response.ok) {
-                    selectedProxies.clear();
-                    selectAllCheckbox.checked = false;
-                    fetchProxies();
-                } else {
-                    alert('Failed to delete proxies');
-                }
-            } catch (error) {
-                console.error('Error deleting proxies:', error);
-                alert('Error deleting proxies');
+        const confirmed = await showConfirm(`Delete ${selectedProxies.size} selected proxies?`, {
+            title: 'Delete Proxies',
+            confirmText: 'Delete',
+            danger: true
+        });
+        if (!confirmed) return;
+
+        try {
+            const response = await fetch('/api/proxies/manage', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: Array.from(selectedProxies) })
+            });
+            
+            if (response.ok) {
+                selectedProxies.clear();
+                selectAllCheckbox.checked = false;
+                showToast('Selected proxies deleted.', 'success');
+                fetchProxies();
+            } else {
+                showToast('Failed to delete proxies.', 'error');
             }
+        } catch (error) {
+            console.error('Error deleting proxies:', error);
+            showToast('Error deleting proxies.', 'error');
         }
     });
 
@@ -126,6 +230,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 addResult.innerHTML = msg;
                 addResult.className = 'text-success';
+                showToast('Proxies updated successfully.', 'success');
                 setTimeout(() => {
                     addModal.style.display = 'none';
                     fetchProxies();
@@ -134,12 +239,14 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 addResult.textContent = `Error: ${result.error || 'Unknown error'}`;
                 addResult.className = 'text-danger';
+                showToast('Failed to add proxies.', 'error');
                 btnConfirmAdd.disabled = false;
             }
         } catch (error) {
             console.error('Error adding proxies:', error);
             addResult.textContent = 'Network error occurred.';
             addResult.className = 'text-danger';
+            showToast('Network error while adding proxies.', 'error');
             btnConfirmAdd.disabled = false;
         }
     });

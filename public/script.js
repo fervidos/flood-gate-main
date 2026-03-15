@@ -1,6 +1,104 @@
 // Initialize Socket.io
 const socket = io();
 
+function ensureUxElements() {
+  let toastHost = document.getElementById('ux-toast-host');
+  if (!toastHost) {
+    toastHost = document.createElement('div');
+    toastHost.id = 'ux-toast-host';
+    toastHost.className = 'ux-toast-host';
+    document.body.appendChild(toastHost);
+  }
+
+  let confirmOverlay = document.getElementById('ux-confirm-overlay');
+  if (!confirmOverlay) {
+    confirmOverlay = document.createElement('div');
+    confirmOverlay.id = 'ux-confirm-overlay';
+    confirmOverlay.className = 'modal-overlay ux-confirm-overlay';
+    confirmOverlay.innerHTML = `
+      <div class="modal-content" style="max-width: 420px;">
+        <div class="modal-header">
+          <h3 id="ux-confirm-title">Confirm Action</h3>
+        </div>
+        <p id="ux-confirm-message" class="ux-confirm-text"></p>
+        <div class="ux-confirm-actions">
+          <button id="ux-confirm-cancel" class="btn btn-secondary">Cancel</button>
+          <button id="ux-confirm-ok" class="btn btn-primary">Confirm</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(confirmOverlay);
+  }
+}
+
+function showToast(message, type = 'info', timeout = 2400) {
+  ensureUxElements();
+  const toastHost = document.getElementById('ux-toast-host');
+  const toast = document.createElement('div');
+  toast.className = `ux-toast ux-toast-${type}`;
+  toast.textContent = message;
+  toastHost.appendChild(toast);
+
+  requestAnimationFrame(() => {
+    toast.classList.add('visible');
+  });
+
+  window.setTimeout(() => {
+    toast.classList.remove('visible');
+    window.setTimeout(() => toast.remove(), 200);
+  }, timeout);
+}
+
+function showConfirm(message, options = {}) {
+  ensureUxElements();
+  const {
+    title = 'Confirm Action',
+    confirmText = 'Confirm',
+    cancelText = 'Cancel',
+    danger = false
+  } = options;
+
+  const overlay = document.getElementById('ux-confirm-overlay');
+  const titleEl = document.getElementById('ux-confirm-title');
+  const messageEl = document.getElementById('ux-confirm-message');
+  const okBtn = document.getElementById('ux-confirm-ok');
+  const cancelBtn = document.getElementById('ux-confirm-cancel');
+
+  titleEl.textContent = title;
+  messageEl.textContent = message;
+  okBtn.textContent = confirmText;
+  cancelBtn.textContent = cancelText;
+  okBtn.className = danger ? 'btn btn-danger' : 'btn btn-primary';
+
+  overlay.style.display = 'flex';
+
+  return new Promise((resolve) => {
+    const cleanup = () => {
+      overlay.style.display = 'none';
+      okBtn.onclick = null;
+      cancelBtn.onclick = null;
+      overlay.onclick = null;
+    };
+
+    okBtn.onclick = () => {
+      cleanup();
+      resolve(true);
+    };
+
+    cancelBtn.onclick = () => {
+      cleanup();
+      resolve(false);
+    };
+
+    overlay.onclick = (event) => {
+      if (event.target === overlay) {
+        cleanup();
+        resolve(false);
+      }
+    };
+  });
+}
+
 // Chart Configuration
 let trafficChart;
 
@@ -149,9 +247,12 @@ socket.on('connect', () => {
   console.log('Connected to server');
   const statusBadges = document.querySelectorAll('.status-badge');
   statusBadges.forEach(el => {
-    // Logic for status text update if needed
     const text = el.querySelector('.status-text');
-    if (text) text.style.display = 'inline';
+    if (text) {
+      text.textContent = 'Online';
+      text.style.display = 'inline';
+      text.style.color = 'var(--accent-green)';
+    }
   });
   socket.emit('request_stats');
 });
@@ -161,7 +262,11 @@ socket.on('disconnect', () => {
   const statusBadges = document.querySelectorAll('.status-badge');
   statusBadges.forEach(el => {
     const text = el.querySelector('.status-text');
-    if (text) text.style.display = 'none'; // Or change text to Offline
+    if (text) {
+      text.textContent = 'Offline';
+      text.style.display = 'inline';
+      text.style.color = 'var(--accent-red)';
+    }
   });
 });
 
@@ -174,7 +279,7 @@ socket.on('stats_update', (data) => {
 
 socket.on('proxy_check_progress', (data) => {
   const statusDiv = document.getElementById('proxy-status');
-  const btn = document.getElementById('btn-check-proxies');
+  const btn = document.getElementById('btn-refresh-proxies') || document.getElementById('btn-check-proxies');
 
   if (statusDiv && btn) {
     btn.disabled = true;
@@ -187,7 +292,7 @@ socket.on('proxy_check_progress', (data) => {
 
     if (data.checked === data.total) {
       btn.disabled = false;
-      btn.textContent = 'Refresh Proxies';
+      btn.textContent = btn.id === 'btn-refresh-proxies' ? 'Refresh Counter' : 'Refresh Proxies';
       btn.style.opacity = '1';
     }
   }
@@ -201,8 +306,7 @@ socket.on('attack_stopped', (data) => {
 });
 
 socket.on('all_attacks_stopped', (data) => {
-  // Using custom alert or stick to browser alert for now
-  alert(`Stopped ${data.count} active attacks.`);
+  showToast(`Stopped ${data.count} active attacks.`, 'success');
   const modal = document.getElementById("victim-modal");
   if (modal.style.display === "flex") {
     loadVictims();
@@ -365,16 +469,26 @@ if (btnRefresh) {
 
 // Stop All Button
 document.getElementById('btn-stop-all').addEventListener('click', async () => {
-  if (!confirm('Are you sure you want to stop ALL active attacks?')) return;
+  const confirmed = await showConfirm('Are you sure you want to stop all active attacks?', {
+    title: 'Stop All Attacks',
+    confirmText: 'Stop All',
+    danger: true
+  });
+  if (!confirmed) return;
+
   const btn = document.getElementById('btn-stop-all');
   const originalText = btn.innerHTML;
   btn.disabled = true;
   btn.innerHTML = 'Stopping...';
 
   try {
-    await fetch('/api/attack/stop-all', { method: 'POST' });
+    const response = await fetch('/api/attack/stop-all', { method: 'POST' });
+    if (!response.ok) {
+      throw new Error('Stop all failed');
+    }
+    showToast('Stop-all request sent.', 'success');
   } catch (error) {
-    alert('Failed to stop attacks');
+    showToast('Failed to stop attacks.', 'error');
   } finally {
     btn.disabled = false;
     btn.innerHTML = originalText;
@@ -797,16 +911,19 @@ document.addEventListener('DOMContentLoaded', () => {
       };
 
       try {
-        await fetch('/api/attack/start', {
+        const response = await fetch('/api/attack/start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
-        alert('Attack Started');
+        if (!response.ok) {
+          throw new Error('Start failed');
+        }
+        showToast('Attack started.', 'success');
         document.getElementById('add-victim-modal').style.display = 'none';
         loadVictims();
       } catch (e) {
-        alert('Error starting attack');
+        showToast('Error starting attack.', 'error');
       } finally {
         btn.disabled = false;
         btn.textContent = 'Initialize Attack Sequence';
@@ -817,12 +934,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Global Helpers for buttons injected in innerHTML
 window.stopAttack = async (username) => {
-  if (confirm(`Stop attack on ${username}?`)) {
-    await fetch('/api/attack/stop', {
+  const confirmed = await showConfirm(`Stop attack on ${username}?`, {
+    title: 'Stop Attack',
+    confirmText: 'Stop',
+    danger: true
+  });
+  if (!confirmed) return;
+
+  try {
+    const response = await fetch('/api/attack/stop', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username })
     });
+    if (!response.ok) {
+      throw new Error('Stop failed');
+    }
+    showToast(`Stopped attack on ${username}.`, 'success');
+  } catch (error) {
+    showToast(`Failed to stop attack on ${username}.`, 'error');
   }
 }
 window.pauseAttack = async (username) => {
