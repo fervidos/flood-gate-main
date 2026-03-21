@@ -334,8 +334,9 @@ export const StatsService = {
 
     // Simplified aggregation for single process (called primarily by main loop)
     async processBufferedStats(payload) {
-        if (payload.attack) {
+        if (payload && payload.attack) {
             const workerStats = payload.attack;
+            if (!workerStats.details) return;
             // 1. Update individual victim stats
             for (const [username, stats] of Object.entries(workerStats.details)) {
                 if (stats.s > 0 || stats.f > 0) {

@@ -2,6 +2,7 @@
  * Unit Tests for Attack Service
  */
 
+import { jest } from '@jest/globals';
 import { AttackService } from '../../src/services/attack.service.js';
 import { NGLService } from '../../src/services/ngl.service.js';
 import { StatsService } from '../../src/services/stats.service.js';

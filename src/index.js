@@ -17,7 +17,7 @@ async function main() {
         await AuthService.initAdmin();
         await QueueService.loadFromDb();
 
-        // Load Proxies
+        // Load Proxies — starts server immediately, fetches remote proxies in background
         await ProxyService.loadProxies();
 
         // Start periodic stats reporting

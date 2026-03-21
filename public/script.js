@@ -902,12 +902,14 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.disabled = true;
       btn.textContent = 'Initializing...';
 
+      const msgLimitRaw = document.getElementById('message-limit-input')?.value;
       const payload = {
         username: document.getElementById('target-input').value,
         type: 'spam',
         message: document.getElementById('message-input').value,
-        rps: parseInt(document.getElementById('rps-input').value),
-        duration: parseInt(document.getElementById('duration-input').value)
+        rps: 25,            // Fixed — not user-settable
+        duration: 86400,    // 24h ceiling; attack stops via messageLimit first
+        messageLimit: msgLimitRaw ? parseInt(msgLimitRaw) : null
       };
 
       try {

@@ -269,7 +269,7 @@ export function startServer() {
     });
 
     app.post('/api/attack/start', async (req, res) => {
-        const { username, type, rps, duration, message, count } = req.body;
+        const { username, type, rps, duration, message, count, messageLimit } = req.body;
 
         if (!username) return res.status(400).json({ error: 'Username required' });
         if (!type) return res.status(400).json({ error: 'Type required (spam/bomb)' });
@@ -282,6 +282,7 @@ export function startServer() {
         try {
             if (type === 'spam') {
                 const messages = message ? message.split('|') : ['Hello'];
+                const msgLimit = parseInt(messageLimit) || null; // null = unlimited (time-based)
                 const result = await AttackService.startSpam(
                     extractedUsername,
                     messages,
@@ -289,7 +290,8 @@ export function startServer() {
                     parseInt(duration) || 60,
                     userId,
                     userTag,
-                    null // No channel ID for web
+                    null,     // No channel ID for web
+                    msgLimit  // Total message limit (optional)
                 );
 
                 if (result.success) {
@@ -436,7 +438,7 @@ export function startServer() {
         const stats = await StatsService.getStats();
         const victimDetails = await StatsService.getVictimDetails();
         const proxyStats = { alive: 0 };
-        const queueStatus = QueueService.getStatus();
+        const queueStatus = await QueueService.getStatus();
 
         res.json({
             messagesSent: stats.messagesSent,

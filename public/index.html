@@ -227,19 +227,14 @@
                     <div id="target-error" class="field-error"></div>
                 </div>
 
-                <div class="form-grid-2">
-                    <div class="form-group">
-                        <label>RPS Limit</label>
-                        <input type="number" id="rps-input" class="input-field" value="50" min="1" max="500">
-                        <div class="input-help">Recommended: 20-120 for stable throughput.</div>
-                        <div id="rps-error" class="field-error"></div>
-                    </div>
-                    <div class="form-group">
-                        <label>Duration (Seconds)</label>
-                        <input type="number" id="duration-input" class="input-field" value="60" min="10" max="3600">
-                        <div class="input-help">Allowed range: 10 to 3600 seconds.</div>
-                        <div id="duration-error" class="field-error"></div>
-                    </div>
+                <div class="form-group" style="display:flex; gap:10px; align-items:center; background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:8px; padding:10px 14px; font-size:12px; color:var(--text-muted);">
+                    <span>⚡ <b style="color:var(--text-main)">RPS:</b> 25 &nbsp;·&nbsp; <b style="color:var(--text-main)">Duration:</b> runs until message limit is reached</span>
+                </div>
+
+                <div class="form-group">
+                    <label>Message Limit</label>
+                    <input type="number" id="message-limit-input" class="input-field" min="1" placeholder="e.g. 100">
+                    <div class="input-help">Attack stops automatically after this many successful sends.</div>
                 </div>
 
                 <div class="form-group">
@@ -308,7 +303,7 @@
     </div>
 
     <script src="bg.js"></script>
-    <script src="script.js?v=21"></script>
+    <script src="script.js?v=22"></script>
 </body>
 
 </html>

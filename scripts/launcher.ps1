@@ -1,9 +1,21 @@
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.Drawing
-
-# Set working directory to project root (parent of scripts folder)
+# Ensure we have the correct project root
+if (-not $PSScriptRoot) {
+    $PSScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+}
 $projectRoot = Split-Path -Parent $PSScriptRoot
+if (-not (Test-Path $projectRoot)) {
+    $projectRoot = Get-Location
+}
 Set-Location $projectRoot
+
+# Load Windows Forms assemblies
+try {
+    Add-Type -AssemblyName System.Windows.Forms
+    Add-Type -AssemblyName System.Drawing
+} catch {
+    Write-Host "Error: Unable to load Windows Forms. This script requires .NET Framework." -ForegroundColor Red
+    exit 1
+}
 
 # Hide PowerShell console
 Add-Type -Name Window -Namespace Console -MemberDefinition '
@@ -89,11 +101,16 @@ $global:nodeProcess = $null
 # Function to check if app is already running
 function Test-AppRunning {
     try {
-        $proc = Get-CimInstance Win32_Process -Filter "Name = 'node.exe' and CommandLine LIKE '%src%index.js%'" -ErrorAction SilentlyContinue
-        return $proc -ne $null
+        # First try WMI (more reliable across Windows versions)
+        $proc = Get-WmiObject Win32_Process -Filter "Name = 'node.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*src*index.js*' }
+        if ($proc) { return $true }
+        
+        # Fallback: Check by process name and port
+        $netstat = netstat -ano 2>$null | Select-String "3000.*LISTENING"
+        return $netstat -ne $null
     } catch {
-        # Fallback for older PowerShell versions or restricted permissions
-        $proc = Get-WmiObject Win32_Process -Filter "Name = 'node.exe' and CommandLine LIKE '%src%index.js%'" -ErrorAction SilentlyContinue
+        # Last resort: check for any node process
+        $proc = Get-Process node -ErrorAction SilentlyContinue
         return $proc -ne $null
     }
 }
@@ -162,6 +179,7 @@ $btnStop.Add_Click({
     if ($global:nodeProcess -and -not $global:nodeProcess.HasExited) {
         try {
             $global:nodeProcess | Stop-Process -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Milliseconds 500
         } catch {
             # ignore
         }
@@ -169,10 +187,7 @@ $btnStop.Add_Click({
 
     try {
         # If we didn't start it, or if it was started elsewhere, try to find it
-        $procs = Get-CimInstance Win32_Process -Filter "Name = 'node.exe' and CommandLine LIKE '%src%index.js%'" -ErrorAction SilentlyContinue
-        if ($null -eq $procs) {
-            $procs = Get-WmiObject Win32_Process -Filter "Name = 'node.exe' and CommandLine LIKE '%src%index.js%'" -ErrorAction SilentlyContinue
-        }
+        $procs = Get-WmiObject Win32_Process -Filter "Name = 'node.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*src*index.js*' }
 
         if ($procs) {
             $procs | ForEach-Object { 
@@ -181,9 +196,14 @@ $btnStop.Add_Click({
         }
     } catch {
         # Last resort fallback if WMI fails
-        Stop-Process -Name "node" -Force -ErrorAction SilentlyContinue
+        try {
+            Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force
+        } catch {
+            # ignore
+        }
     }
     
+    Start-Sleep -Milliseconds 500
     $global:nodeProcess = $null
     Update-UIState -isRunning $false
 })
@@ -196,10 +216,7 @@ $btnDashboard.Add_Click({
 # Cleanup
 $form.Add_FormClosing({
     try {
-        $procs = Get-CimInstance Win32_Process -Filter "Name = 'node.exe' and CommandLine LIKE '%src%index.js%'" -ErrorAction SilentlyContinue
-        if ($null -eq $procs) {
-            $procs = Get-WmiObject Win32_Process -Filter "Name = 'node.exe' and CommandLine LIKE '%src%index.js%'" -ErrorAction SilentlyContinue
-        }
+        $procs = Get-WmiObject Win32_Process -Filter "Name = 'node.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*src*index.js*' }
 
         if ($procs) {
             $procs | ForEach-Object { 
@@ -207,7 +224,8 @@ $form.Add_FormClosing({
             }
         }
     } catch {
-        # Do nothing on close if we can't identify cleanly
+        # Fallback attempt
+        Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
     }
 })
 

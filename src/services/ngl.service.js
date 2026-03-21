@@ -245,5 +245,82 @@ export const NGLService = {
 
         // Should never reach here, but just in case
         return { success: false, error: 'Max retries exceeded', timestamp: Date.now() };
+    },
+
+    /**
+     * Send a message by trying each proxy in the pool sequentially until one succeeds.
+     * Moves immediately to the next proxy on failure — no backoff delay.
+     * @param {string} username
+     * @param {string} message
+     * @returns {Promise<{success: boolean, proxy?: string, ...}>}
+     */
+    async sendMessageWithProxyFallback(username, message) {
+        const proxies = ProxyService.proxies;
+
+        // No proxies — fall back to single direct attempt
+        if (proxies.length === 0) {
+            return this.sendMessage(username, message, 0);
+        }
+
+        // Walk through every proxy once, starting from the current round-robin index
+        const startIndex = ProxyService.currentIndex;
+        const total = proxies.length;
+
+        for (let i = 0; i < total; i++) {
+            const proxyIdx = (startIndex + i) % total;
+            const proxy = proxies[proxyIdx];
+
+            // Advance the global round-robin cursor so the next call continues from here
+            ProxyService.currentIndex = (proxyIdx + 1) % total;
+
+            const startTime = Date.now();
+            const proxyUrl = `${proxy.host}:${proxy.port}`;
+
+            try {
+                const deviceId = await import('../utils/functions/deviceid.js').then(m => m.deviceid());
+                const { getRandomUserAgent } = await import('../utils/useragents.js');
+                const userAgent = getRandomUserAgent();
+                const headers = this.getRandomHeaders(userAgent);
+                const proxyAgent = ProxyService.getAgent(proxy);
+
+                const url = 'https://ngl.link/api/submit';
+                const data = {
+                    username: username.toLowerCase(),
+                    question: message,
+                    deviceId,
+                    gameSlug: '',
+                    referrer: headers['Referer']
+                };
+
+                const response = await axiosInstance.post(url, data, {
+                    headers,
+                    httpsAgent: proxyAgent || undefined,
+                    httpAgent: proxyAgent || undefined
+                });
+
+                const latency = Date.now() - startTime;
+
+                if (response.status === 200) {
+                    ProxyService.reportSuccess(proxy);
+                    return {
+                        success: true,
+                        status: response.status,
+                        latency,
+                        proxy: proxyUrl,
+                        timestamp: Date.now()
+                    };
+                }
+
+                // Non-200 status — report and try next proxy
+                ProxyService.reportFailure(proxy);
+            } catch (_err) {
+                // Network / timeout error — report and try next proxy immediately
+                ProxyService.reportFailure(proxy);
+            }
+        }
+
+        // All proxies exhausted without success
+        return { success: false, error: 'All proxies failed', timestamp: Date.now() };
     }
 };
+

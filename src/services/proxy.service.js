@@ -14,7 +14,9 @@ export const ProxyService = {
     
     // Configurable proxy sources
     proxySources: [
-        'https://raw.githubusercontent.com/officialputuid/KangProxy/refs/heads/KangProxy/socks5/socks5.txt',
+        'https://raw.githubusercontent.com/databay-labs/free-proxy-list/refs/heads/master/socks5.txt',
+        'https://raw.githubusercontent.com/hookzof/socks5_list/master/proxy.txt',
+        'https://raw.githubusercontent.com/ebrasha/abdal-proxy-hub/refs/heads/main/socks5-proxy-list-by-EbraSha.txt',
         // 'https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/socks5.txt', // Fallback example
     ],
 
@@ -99,82 +101,93 @@ export const ProxyService = {
 
     async loadProxies() {
         try {
-            console.log('🔄 Fetching fresh proxies from remote sources...');
+            // Immediately load whatever is already in DB so the server can start right away
+            await this.refreshProxiesFromDB();
+
+            // Start periodic refresh every 10 minutes to check for recovered proxies
+            if (!this.refreshInterval) {
+                this.refreshInterval = setInterval(() => this.refreshProxiesFromDB(), 10 * 60 * 1000);
+            }
+
+            // Fetch & save fresh remote proxies in the background — don't block startup
+            this._fetchAndSaveRemote().catch(err => console.error('Background proxy fetch error:', err));
+
+        } catch (error) {
+            console.error('Failed to load proxies:', error);
+        }
+    },
+
+    async _fetchAndSaveRemote() {
+        try {
+            console.log('🔄 Fetching fresh proxies from remote sources (background)...');
             let remoteProxies = [];
-            
-            for (const source of this.proxySources) {
+
+            // Fetch all sources in parallel
+            await Promise.all(this.proxySources.map(async (source) => {
                 try {
-                    const response = await axios.get(source, { timeout: 10000 });
+                    const response = await axios.get(source, { timeout: 15000 });
                     if (response.data) {
-                        const lines = response.data.split('\n');
-                        const sourceProxies = this.parseProxyLines(lines);
+                        const sourceProxies = this.parseProxyLines(response.data.split('\n'));
                         console.log(`   - Fetched ${sourceProxies.length} proxies from ${source}`);
                         remoteProxies = remoteProxies.concat(sourceProxies);
                     }
                 } catch (err) {
                     console.warn(`   ⚠️ Failed to fetch from ${source}: ${err.message}`);
                 }
-            }
+            }));
 
             // Also load local file if exists
             const localProxies = this.loadLocalProxies();
-            
-            // Combine and Deduplicate
-            const allProxies = [...remoteProxies, ...localProxies];
-            
-            // Deduplicate based on host:port
+
+            // Combine and deduplicate based on host:port
             const uniqueMap = new Map();
-            allProxies.forEach(p => {
+            for (const p of [...remoteProxies, ...localProxies]) {
                 const key = `${p.host}:${p.port}`;
                 if (!uniqueMap.has(key)) uniqueMap.set(key, p);
-            });
-            
+            }
+
             const uniqueProxies = Array.from(uniqueMap.values());
             console.log(`✅ Total unique proxies found: ${uniqueProxies.length}`);
 
-            // Upsert into Database
+            if (uniqueProxies.length === 0) return;
+
+            // Upsert into database — parallel chunks with ordered:false for max throughput
             console.log('💾 Saving proxies to database...');
             const bulkOps = uniqueProxies.map(p => ({
                 updateOne: {
                     filter: { host: p.host, port: p.port },
-                    update: { 
-                        $setOnInsert: { 
-                            host: p.host, 
-                            port: p.port, 
-                            auth: p.auth, 
-                            type: p.type 
-                        } 
+                    update: {
+                        $setOnInsert: {
+                            host: p.host,
+                            port: p.port,
+                            auth: p.auth,
+                            type: p.type
+                        }
                     },
                     upsert: true
                 }
             }));
 
-            if (bulkOps.length > 0) {
-                try {
-                    // Execute in chunks to avoid large payload limits
-                    const chunkSize = 1000;
-                    for (let i = 0; i < bulkOps.length; i += chunkSize) {
-                        await Proxy.bulkWrite(bulkOps.slice(i, i + chunkSize));
-                    }
-                    console.log('✅ Proxies saved/updated in database.');
-                } catch (dbError) {
-                    console.error('❌ Database write failed:', dbError);
+            try {
+                const chunkSize = 5000;
+                const chunks = [];
+                for (let i = 0; i < bulkOps.length; i += chunkSize) {
+                    chunks.push(bulkOps.slice(i, i + chunkSize));
                 }
+                await Promise.all(chunks.map(chunk => Proxy.bulkWrite(chunk, { ordered: false })));
+                console.log('✅ Proxies saved/updated in database.');
+            } catch (dbError) {
+                console.error('❌ Database write failed:', dbError);
             }
 
-            // Load valid proxies from Database
+            // Reload active proxies now that DB is fresh
             await this.refreshProxiesFromDB();
-            
-            // Start periodic refresh every 10 minutes to check for recovered proxies
-            if (!this.refreshInterval) {
-                this.refreshInterval = setInterval(() => this.refreshProxiesFromDB(), 10 * 60 * 1000);
-            }
 
             // Save to file for cache/backup
             this.saveProxiesToFile();
 
         } catch (error) {
-            console.error('Failed to load proxies:', error);
+            console.error('Failed to fetch/save remote proxies:', error);
         }
     },
 
@@ -329,15 +342,15 @@ export const ProxyService = {
             if (memProxy) {
                 memProxy.failCount = (memProxy.failCount || 0) + 1;
                 
-                if (memProxy.failCount > 5) {
-                    console.log(`❌ Proxy ${proxy.host}:${proxy.port} failed >5 times. BANNING.`);
+                if (memProxy.failCount > 20) {
+                    console.log(`❌ Proxy ${proxy.host}:${proxy.port} failed >20 times. BANNING.`);
                     
                     // Remove from active list
                     this.proxies = this.proxies.filter(p => p.host !== proxy.host || p.port !== proxy.port);
                     this.agentCache.delete(`${proxy.type === 'socks5' ? 'socks5' : 'http'}://${proxy.auth ? proxy.auth + '@' : ''}${proxy.host}:${proxy.port}`);
 
                     // Add to Ban List
-                    await BannedProxy.create({ host: proxy.host, port: proxy.port, reason: 'Excessive failures (>5)' })
+                    await BannedProxy.create({ host: proxy.host, port: proxy.port, reason: 'Excessive failures (>20)' })
                         .catch(err => console.log('Already banned or error banning:', err.message));
 
                     // Remove from Proxy List
