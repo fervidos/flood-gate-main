@@ -23,9 +23,12 @@ async function main() {
         // Start periodic stats reporting
         setInterval(() => {
             const attackStats = AttackService.getAndResetStats();
-            // We can't use await inside setInterval easily without wrapper, but firing it is okay
             StatsService.processBufferedStats({ attack: attackStats }).catch(console.error);
         }, 1000);
+
+        // Start Scheduled Attacks Manager
+        const { ScheduleService } = await import('./services/schedule.service.js');
+        ScheduleService.start();
 
         // Start Web Server
         startServer();

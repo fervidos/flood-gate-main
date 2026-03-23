@@ -169,6 +169,66 @@ export function startServer() {
         }
     });
 
+    // --- Scheduled Attacks API ---
+    app.get('/api/scheduled', async (req, res) => {
+        try {
+            const { ScheduleService } = await import('../services/schedule.service.js');
+            const schedules = await ScheduleService.listSchedules();
+            res.json(schedules);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    app.post('/api/scheduled', async (req, res) => {
+        try {
+            const { username, messages, amount, intervalMinutes } = req.body;
+            if (!username || !messages || !amount || !intervalMinutes) {
+                return res.status(400).json({ error: 'Missing required schedule params' });
+            }
+            const { ScheduleService } = await import('../services/schedule.service.js');
+            const userTokenData = req.user || { id: 'system', username: 'Web Admin' };
+            const schedule = await ScheduleService.createSchedule({
+                username, messages, amount, intervalMinutes,
+                userId: userTokenData.id,
+                userTag: userTokenData.username
+            });
+            res.json(schedule);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    app.delete('/api/scheduled/:id', async (req, res) => {
+        try {
+            const { ScheduleService } = await import('../services/schedule.service.js');
+            await ScheduleService.deleteSchedule(req.params.id);
+            res.json({ success: true });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    app.post('/api/scheduled/:id/pause', async (req, res) => {
+        try {
+            const { ScheduleService } = await import('../services/schedule.service.js');
+            await ScheduleService.stopSchedule(req.params.id);
+            res.json({ success: true });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    app.post('/api/scheduled/:id/resume', async (req, res) => {
+        try {
+            const { ScheduleService } = await import('../services/schedule.service.js');
+            await ScheduleService.resumeSchedule(req.params.id);
+            res.json({ success: true });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    });
+
     app.get('/', async (req, res) => {
         display(req, res);
     });

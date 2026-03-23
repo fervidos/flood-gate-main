@@ -980,3 +980,127 @@ window.openAttackModal = function(username) {
       modal.style.display = 'flex';
   }
 }
+
+// Scheduled Attacks Modal Logic
+document.addEventListener('DOMContentLoaded', () => {
+    const navSchedules = document.getElementById('nav-schedules');
+    const scheduleModal = document.getElementById('schedule-modal');
+    const createScheduleModal = document.getElementById('create-schedule-modal');
+
+    // Toggle main modal
+    if (navSchedules && scheduleModal) {
+        navSchedules.onclick = (e) => {
+            e.preventDefault();
+            scheduleModal.style.display = 'flex';
+            loadSchedules();
+        };
+    }
+
+    // Toggle create modal
+    const btnCreate = document.getElementById('btn-create-schedule');
+    if (btnCreate && createScheduleModal) {
+        btnCreate.onclick = () => createScheduleModal.style.display = 'flex';
+    }
+
+    // Close handlers
+    document.querySelectorAll('.close-schedule-modal').forEach(btn => {
+        btn.onclick = () => scheduleModal.style.display = 'none';
+    });
+    document.querySelectorAll('.close-create-schedule-modal').forEach(btn => {
+        btn.onclick = () => createScheduleModal.style.display = 'none';
+    });
+
+    // Load Schedules
+    async function loadSchedules() {
+        try {
+            const res = await fetch('/api/scheduled');
+            const data = await res.json();
+            const tbody = document.getElementById('schedule-list-body');
+            if(!tbody) return;
+            tbody.innerHTML = '';
+            
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="padding:10px;text-align:center;color:var(--text-muted);">No schedules active.</td></tr>';
+                return;
+            }
+
+            data.forEach(s => {
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid var(--border-subtle)';
+                
+                const nextDate = new Date(s.nextRun).toLocaleString();
+                const statusColor = s.status === 'active' ? 'var(--accent-green)' : 'var(--accent-orange)';
+                
+                tr.innerHTML = `
+                    <td style="padding:10px;">${s.username}</td>
+                    <td style="padding:10px;">${s.amount}</td>
+                    <td style="padding:10px;">${s.intervalMinutes}m</td>
+                    <td style="padding:10px;">${nextDate}</td>
+                    <td style="padding:10px; color:${statusColor}">${s.status.toUpperCase()}</td>
+                    <td style="padding:10px; display:flex; gap:5px;">
+                        ${s.status === 'active' 
+                            ? `<button class="btn btn-xs" style="background:var(--bg-hover);" onclick="pauseSchedule('${s.id}')">Pause</button>`
+                            : `<button class="btn btn-xs" style="background:var(--bg-hover);" onclick="resumeSchedule('${s.id}')">Resume</button>`
+                        }
+                        <button class="btn btn-xs" style="background:rgba(239,68,68,0.2); color:var(--accent-red);" onclick="deleteSchedule('${s.id}')">Delete</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (e) {
+            console.error('Failed to load schedules', e);
+        }
+    }
+
+    // Form submission
+    const form = document.getElementById('schedule-form');
+    if (form) {
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('btn-submit-schedule');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+
+            const payload = {
+                username: document.getElementById('sched-username-input').value,
+                amount: parseInt(document.getElementById('sched-amount-input').value),
+                intervalMinutes: parseInt(document.getElementById('sched-interval-input').value),
+                messages: document.getElementById('sched-messages-input').value.split('|').map(m => m.trim()).filter(m => m)
+            };
+
+            try {
+                const res = await fetch('/api/scheduled', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if(!res.ok) throw new Error();
+                showToast('Schedule created!', 'success');
+                createScheduleModal.style.display = 'none';
+                form.reset();
+                loadSchedules();
+            } catch(e) {
+                showToast('Failed to create schedule.', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Start Schedule';
+            }
+        };
+    }
+
+    // Global actions
+    window.pauseSchedule = async (id) => {
+        await fetch(`/api/scheduled/${id}/pause`, { method: 'POST' });
+        loadSchedules();
+    };
+    window.resumeSchedule = async (id) => {
+        await fetch(`/api/scheduled/${id}/resume`, { method: 'POST' });
+        loadSchedules();
+    };
+    window.deleteSchedule = async (id) => {
+        if(confirm('Are you sure you want to delete this schedule?')) {
+            await fetch(`/api/scheduled/${id}`, { method: 'DELETE' });
+            loadSchedules();
+        }
+    };
+});
