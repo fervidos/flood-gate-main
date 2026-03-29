@@ -47,7 +47,8 @@ class ScheduleManager {
                     messages: schedule.messages,
                     rps: 25, // Fixed RPS for stability
                     duration: 3600, // Safe ceiling
-                    priority: 5 // Optional: elevate priority?
+                    priority: 5, // Optional: elevate priority?
+                    scheduleId: schedule.id
                 });
 
                 // Advance nextRun
@@ -93,6 +94,7 @@ class ScheduleManager {
     }
 
     async deleteSchedule(id) {
+        await QueueService.removeByScheduleId(id);
         return ScheduledAttack.findOneAndDelete({ id });
     }
 }

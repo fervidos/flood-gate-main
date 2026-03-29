@@ -1,154 +1,133 @@
-# 🌊 FloodGate V2
+# 🌊 FloodGate
 
-🚀 **New V2.0 Update is now live!**
+<p align="center">
+  <img src="public/logo.png" alt="FloodGate Banner" width="400" />
+</p>
 
-[![npm version](https://img.shields.io/badge/npm-%3E%3D18.0.0-blue.svg)](https://www.npmjs.com/package/floodgate)
-[![License](https://img.shields.io/badge/license-ISC-green.svg)](LICENSE)
-[![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org)
+<p align="center">
+  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/Node.js-%3E%3D18.0.0-brightgreen.svg" alt="Node.js"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-ISC-blue.svg" alt="License"></a>
+  <a href="https://github.com/RhazeCoder/floodgate"><img src="https://img.shields.io/badge/Version-2.0.0-orange.svg" alt="Version"></a>
+</p>
 
-![FloodGate Banner](public/logo.png)
-
----
-
-## 📖 Table of Contents
-- [⚠️ Disclaimer](#️-disclaimer)
-- [🚀 Overview](#-overview)
-- [✨ Features](#-features)
-- [🔧 Installation](#-installation)
-- [⚙️ Configuration](#-configuration)
-- [▶️ Usage](#-usage)
-- [📸 Screenshots](#-screenshots)
-- [🤝 Contributing](#-contributing)
-- [📄 License](#-license)
-- [🗂️ Changelog](#-changelog)
+<p align="center">
+  <strong>🔥 High-Performance Network Automation & Load Testing System</strong>
+</p>
 
 ---
 
-## ⚠️ Disclaimer
-**THIS PROJECT IS FOR EDUCATIONAL PURPOSES ONLY**. It demonstrates network automation, proxy rotation, and real‑time dashboards. Do **not** use it for harassment, spamming, or any illegal activity.
-
----
+> [!CAUTION]
+> **Educational Purposes Only**
+> This project demonstrates advanced network automation, load testing, proxy rotation, and real-time dashboard telemetry. Do **not** use it for harassment, spamming, DoS/DDoS, or any illegal activity. The author and contributors are **not** responsible for any misuse.
 
 ## 🚀 Overview
-FloodGate is a high‑performance automation system built with Node.js. It showcases:
-- **Microservice‑style architecture** – clean separation of concerns.
-- **Real‑time WebSocket dashboard** – live statistics without page reloads.
-- **Advanced proxy rotation** – automatic health checks and failover.
-- **Comprehensive statistics tracking** – messages, RPS, success rates, bandwidth.
-- **Queue‑based attack management** – schedule sequential attacks with pause/resume.
-- **Template engine** – custom message templates for flexible payloads.
 
-The V2.0 rewrite focuses on performance, stability, and a premium UI.
+**FloodGate** is a cutting-edge automation orchestrator built heavily over Node.js. It features a microservice-style architecture, a real-time WebSocket dashboard, advanced multi-protocol proxy rotation, and high-precision load simulation capabilities.
 
----
+V2.0 has been entirely rewritten from the ground up to focus on ultimate performance, zero-downtime stability, and a premium _Glassmorphism_ User Interface for telemetry tracking.
 
-## ✨ Features
-- **High‑Precision Attacks** – control exact RPS (1‑500+), with improved timing logic.
-- **Smart Proxy Rotation** – automatic health checks, rotating residential proxies, bandwidth monitoring.
-- **Live Dashboard** – WebSocket‑powered UI updates instantly; no manual refresh.
-- **Unlimited Victim Database** – MongoDB‑backed storage, searchable, filterable, with pagination.
-- **Bandwidth Monitor** – per‑session and total bytes sent/received, real‑time rate graphs.
-- **Responsive SaaS Dark Mode UI** – modern dark theme, glass‑morphism cards, micro‑animations.
-- **Cross‑Platform Support** – works on Windows, macOS, Linux; includes a Windows launcher.
-- **Extensible Plugin System** – add custom modules via the `services/` directory.
+## ✨ Key Features
+
+- **🎯 High-Precision Traffic Generation** — Control exact RPS (Requests-Per-Second) spanning 1 to 500+, featuring newly refined and threaded timing logic.
+- **🔄 Smart Proxy Rotation** — Automatic health checks, concurrent rotations for residential proxies, and instant zero-downtime failover handling.
+- **⚡ Live Web Dashboard** — WebSocket-powered UI updates real-time analytics instantaneously (no manual refreshing needed).
+- **📊 Real-Time Bandwidth Monitor** — Per-session and total bandwidth tracking visually mapped onto dynamic interactive charts.
+- **💾 Unlimited Data Storage** — Modern MongoDB-backed backend seamlessly stores system data, enabling highly responsive searches, filters, and paginations.
+- **💅 Premium UI/UX** — Modern SaaS dark theme with stunning glassmorphism cards, micro-animations, and smooth web-transitions.
+- **🔌 Extensible Plugin System** — Developer-friendly base. Easily inject custom payload modules into the `services/` ecosystem.
 
 ---
 
-## 🔧 Installation
+## 💻 Tech Stack
+
+- **Backend:** Node.js, Express, Socket.io
+- **Database:** MongoDB / Mongoose
+- **Frontend** Vanilla JS, Canvas Graphs, CSS Micro-animations
+- **Network Tools:** Axios, https-proxy-agent, Puppeteer
+- **Testing Capabilities:** Jest, Supertest
+
+---
+
+## 🛠️ Installation
+
 ### Prerequisites
-- **Node.js** v18 or newer – [download here](https://nodejs.org/).
-- **MongoDB** – local instance or remote URI (e.g., Atlas). Ensure the service is running.
-- **Git** – to clone the repository.
+- Node.js `v18+` (Strictly required for experimental ES modules)
+- MongoDB Database (Local instance or Remote Atlas URI)
+- Git CLI
 
-### Steps
-1. **Clone the repository**
+### Quick Setup
+
+1. **Clone the repository:**
    ```bash
    git clone https://github.com/RhazeCoder/floodgate.git
    cd floodgate
    ```
-2. **Install dependencies**
+
+2. **Install all dependencies:**
    ```bash
    npm install
    ```
-3. **(Optional) Install development tools** – for testing and linting:
-   ```bash
-   npm install --save-dev
+
+3. **Configure Environment Variables:**
+   Create a `.env` file in the project's root directory:
+   ```env
+   # Application Port
+   PORT=3000
+
+   # Database Connection String
+   MONGODB_URI=mongodb://127.0.0.1:27017/floodgate
+
+   # Admin Authentication
+   ADMIN_USERNAME=admin
+   ADMIN_PASSWORD=your_secure_password
    ```
 
----
+   > [!IMPORTANT]  
+   > **DO NOT** commit your `.env` file. Keep your database credentials safe.
 
-## ⚙️ Configuration
-Create a `.env` file in the project root (optional – defaults are provided):
-```env
-PORT=3000               # Web server port
-MONGO_URI=mongodb://127.0.0.1:27017/floodgate   # MongoDB connection string
-OWNER_ID=your_discord_id   # Optional owner identifier for privileged actions
-```
-### Proxy Settings
-Edit `src/services/proxy.service.js` and modify the `PROXY_CONFIG` object with your own credentials if you wish to use a custom proxy provider.
+4. **Launch the Application:**
+   - **On Windows:** Simply double-click `Launcher.bat` for the built-in quick GUI Launcher which provides easy Start/Stop controls.
+   - **Manual Start:** 
+     ```bash
+     npm start
+     ```
+   
+   - **For Developers:**
+     ```bash
+     npm run dev
+     ```
 
-### User‑Agent List
-User‑agents are loaded from `generated_user_agents.txt`. Add or remove entries to customize the pool.
-
----
-
-## ▶️ Usage
-### Windows (Recommended)
-Double‑click `Launcher.bat` – a small GUI will appear with **Start**, **Stop**, and **Open Dashboard** buttons.
-
-### Manual Start (Cross‑platform)
-```bash
-npm start
-```
-The server will start, connect to MongoDB, and listen on the port defined in `.env` (default 3000).
-
-Open your browser and navigate to `http://localhost:3000` to view the dashboard.
-
-### Stopping the Application
-- **Windows launcher** – click **Stop**.
-- **Manual** – press `Ctrl+C` in the terminal or run:
-```bash
-pkill -f node   # Linux/macOS
-Stop-Process -Name node -Force   # PowerShell on Windows
-```
+5. **Open the Dashboard:**
+   Navigate to `http://localhost:3000` via your web browser to view the interface.
 
 ---
 
-## 📸 Screenshots
-![Dashboard Screenshot](screenshots/dashboard.png)
-*The screenshot shows the live dashboard with real‑time stats, active attacks, and bandwidth graphs.*
+## 📸 Dashboard Preview
+
+![FloodGate Dashboard](screenshots/dashboard.png)
+*View real-time attack telemetry, worker statuses, bandwidth saturation, and proxy rotations.*
 
 ---
 
 ## 🤝 Contributing
-Contributions are welcome! Please read `CONTRIBUTING.md` for guidelines on:
-- Submitting pull requests.
-- Reporting bugs or suggesting features.
-- Coding standards and testing requirements.
+
+We heartily welcome open-source contributions!
+1. Fork the project.
+2. Create your targeted feature branch (`git checkout -b feature/AmazingMechanism`).
+3. Commit your meaningful changes (`git commit -m 'Added groundbreaking feature'`).
+4. Push to the branch (`git push origin feature/AmazingMechanism`).
+5. Draft a thorough Pull Request detailing your changes.
+
+Please review the standard `CONTRIBUTING.md` file for full layout guidelines, ES module coding standards, and rigorous testing procedures.
 
 ---
 
-## 📄 License
-This project is licensed under the ISC License – see the [LICENSE](LICENSE) file for details.
+## 🛡️ License & Legal
+
+Distributed freely under the **ISC License**. Refer to `LICENSE` for more profound insights.
+
+> [!WARNING]
+> By cloning, modifying, interacting with, testing, or executing this code, you explicitly acknowledge it is provided purely 'AS IS'. You assume absolutely all responsibility for any damage or legal liability. 
 
 ---
-
-## 🗂️ Changelog
-### V2.0 – 2025‑12‑20
-- Replaced clustering with a single‑process architecture.
-- Migrated all data storage to MongoDB.
-- Introduced premium dark‑mode UI with glass‑morphism.
-- Added real‑time bandwidth monitoring.
-- Implemented rotating proxy support.
-- Refactored codebase for TypeScript‑friendly structure (future work).
-- Updated README with detailed documentation and screenshots.
-
-### V1.x – Previous releases
-- Original multi‑process worker architecture.
-- SQLite‑based storage.
-- Basic dashboard with limited stats.
-- Manual proxy configuration.
-
----
-
-*Enjoy using FloodGate and feel free to reach out via the `issues` tab for any help!*
+<p align="center">Made with ❤️ based on FloodGate Core systems.</p>

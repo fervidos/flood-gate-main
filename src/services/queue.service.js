@@ -39,7 +39,7 @@ class AttackQueue {
 
     async add(attackData) {
         const id = Date.now().toString(36) + Math.random().toString(36).substr(2);
-        const { type, username, userId, userTag, priority = 0 } = attackData;
+        const { type, username, userId, userTag, priority = 0, scheduleId } = attackData;
 
         let payload = {};
         if (type === 'spam') {
@@ -67,6 +67,7 @@ class AttackQueue {
             status: 'queued',
             userId,
             userTag,
+            scheduleId,
             addedAt: new Date()
         };
 
@@ -177,6 +178,15 @@ class AttackQueue {
             return item;
         }
         return null;
+    }
+
+    async removeByScheduleId(scheduleId) {
+        if (!scheduleId) return 0;
+        this.queue = this.queue.filter(i => i.scheduleId !== scheduleId);
+        
+        const dbResult = await QueueItem.deleteMany({ scheduleId });
+        console.log(`[QUEUE] Removed ${dbResult.deletedCount} items tracking schedule: ${scheduleId}`);
+        return dbResult.deletedCount;
     }
 }
 

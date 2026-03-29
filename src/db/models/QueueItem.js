@@ -9,6 +9,7 @@ const QueueItemSchema = new mongoose.Schema({
     status: { type: String, enum: ['queued', 'processing', 'completed', 'failed'], default: 'queued' },
     userId: String,
     userTag: String,
+    scheduleId: String,
     addedAt: { type: Date, default: Date.now }
 });
 
