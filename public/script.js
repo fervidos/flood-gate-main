@@ -437,7 +437,7 @@ if (btnFetch) {
     if (statusDiv) statusDiv.textContent = 'Fetching new proxies...';
 
     try {
-      await fetch('/api/proxies/fetch', { method: 'POST' });
+      await apiFetch('/api/proxies/fetch', { method: 'POST' });
     } catch (error) {
       if (statusDiv) statusDiv.textContent = 'Fetch failed.';
     } finally {
@@ -457,7 +457,7 @@ if (btnRefresh) {
     if (statusDiv) statusDiv.textContent = 'Syncing with DB...';
 
     try {
-      await fetch('/api/proxies/refresh', { method: 'POST' });
+      await apiFetch('/api/proxies/refresh', { method: 'POST' });
     } catch (error) {
       if (statusDiv) statusDiv.textContent = 'Refresh failed.';
     } finally {
@@ -482,7 +482,7 @@ document.getElementById('btn-stop-all').addEventListener('click', async () => {
   btn.innerHTML = 'Stopping...';
 
   try {
-    const response = await fetch('/api/attack/stop-all', { method: 'POST' });
+    const response = await apiFetch('/api/attack/stop-all', { method: 'POST' });
     if (!response.ok) {
       throw new Error('Stop all failed');
     }
@@ -588,7 +588,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function loadVictims() {
     try {
-      const response = await fetch('/api/victims');
+      const response = await apiFetch('/api/victims');
       const victims = await response.json();
       const victimList = document.getElementById("victim-list");
       const scrollTop = victimList.scrollTop;
@@ -860,7 +860,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       newBtn.onclick = async () => {
         // ... save fetch call ...
-        await fetch('/api/victims/note', {
+        await apiFetch('/api/victims/note', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, note: noteInput.value })
@@ -913,7 +913,7 @@ document.addEventListener('DOMContentLoaded', () => {
       };
 
       try {
-        const response = await fetch('/api/attack/start', {
+        const response = await apiFetch('/api/attack/start', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -944,7 +944,7 @@ window.stopAttack = async (username) => {
   if (!confirmed) return;
 
   try {
-    const response = await fetch('/api/attack/stop', {
+    const response = await apiFetch('/api/attack/stop', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username })
@@ -958,14 +958,14 @@ window.stopAttack = async (username) => {
   }
 }
 window.pauseAttack = async (username) => {
-  await fetch('/api/attack/pause', {
+  await apiFetch('/api/attack/pause', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username })
   });
 }
 window.resumeAttack = async (username) => {
-  await fetch('/api/attack/resume', {
+  await apiFetch('/api/attack/resume', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username })
@@ -1013,7 +1013,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Load Schedules
     async function loadSchedules() {
         try {
-            const res = await fetch('/api/scheduled');
+            const res = await apiFetch('/api/scheduled');
             const data = await res.json();
             const tbody = document.getElementById('schedule-list-body');
             if(!tbody) return;
@@ -1069,7 +1069,7 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             try {
-                const res = await fetch('/api/scheduled', {
+                const res = await apiFetch('/api/scheduled', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
@@ -1090,16 +1090,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Global actions
     window.pauseSchedule = async (id) => {
-        await fetch(`/api/scheduled/${id}/pause`, { method: 'POST' });
+        await apiFetch(`/api/scheduled/${id}/pause`, { method: 'POST' });
         loadSchedules();
     };
     window.resumeSchedule = async (id) => {
-        await fetch(`/api/scheduled/${id}/resume`, { method: 'POST' });
+        await apiFetch(`/api/scheduled/${id}/resume`, { method: 'POST' });
         loadSchedules();
     };
     window.deleteSchedule = async (id) => {
         if(confirm('Are you sure you want to delete this schedule?')) {
-            await fetch(`/api/scheduled/${id}`, { method: 'DELETE' });
+          await apiFetch(`/api/scheduled/${id}`, { method: 'DELETE' });
             loadSchedules();
         }
     };

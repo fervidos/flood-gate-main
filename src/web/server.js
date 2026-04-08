@@ -1,4 +1,5 @@
 import express from "express";
+import crypto from "crypto";
 import path from "path";
 import { createServer } from "http";
 import { Server } from "socket.io";
@@ -26,6 +27,37 @@ const io = new Server(httpServer, {
     }
 });
 const port = process.env.PORT || 3000;
+const IS_PROD = process.env.NODE_ENV === 'production';
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+const AUTH_COOKIE_OPTIONS = {
+    httpOnly: true,
+    secure: IS_PROD,
+    sameSite: 'lax',
+    maxAge: ONE_DAY_MS,
+    path: '/'
+};
+const CSRF_COOKIE_NAME = 'csrf_token';
+const CSRF_COOKIE_OPTIONS = {
+    httpOnly: false,
+    secure: IS_PROD,
+    sameSite: 'lax',
+    maxAge: ONE_DAY_MS,
+    path: '/'
+};
+const CSRF_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+const generateCsrfToken = () => crypto.randomBytes(32).toString('hex');
+const ensureCsrfCookie = (req, res) => {
+    if (!req.cookies?.[CSRF_COOKIE_NAME]) {
+        res.cookie(CSRF_COOKIE_NAME, generateCsrfToken(), CSRF_COOKIE_OPTIONS);
+    }
+};
+const requireAdmin = (req, res, next) => {
+    if (!req.user || req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Admin access required' });
+    }
+    return next();
+};
 
 // Performance: Track last broadcast to skip unchanged data
 
@@ -62,7 +94,8 @@ export function startServer() {
         }
     }, 1000);
 
-    app.use(express.json());
+    app.disable('x-powered-by');
+    app.use(express.json({ limit: '256kb' }));
     app.use(cookieParser());
 
     app.get('/login', (req, res) => {
@@ -74,7 +107,8 @@ export function startServer() {
         try {
             const result = await AuthService.login(username, password);
             if (result.success) {
-                res.cookie('token', result.token, { httpOnly: true, maxAge: 24 * 60 * 60 * 1000 });
+                res.cookie('token', result.token, AUTH_COOKIE_OPTIONS);
+                res.cookie(CSRF_COOKIE_NAME, generateCsrfToken(), CSRF_COOKIE_OPTIONS);
                 res.json({ success: true });
             } else {
                 res.status(401).json({ success: false, message: result.message });
@@ -85,7 +119,16 @@ export function startServer() {
     });
 
     app.post('/api/logout', (req, res) => {
-        res.clearCookie('token');
+        res.clearCookie('token', {
+            path: '/',
+            sameSite: AUTH_COOKIE_OPTIONS.sameSite,
+            secure: AUTH_COOKIE_OPTIONS.secure
+        });
+        res.clearCookie(CSRF_COOKIE_NAME, {
+            path: '/',
+            sameSite: CSRF_COOKIE_OPTIONS.sameSite,
+            secure: CSRF_COOKIE_OPTIONS.secure
+        });
         res.json({ success: true });
     });
 
@@ -106,7 +149,21 @@ export function startServer() {
         }
         
         req.user = user;
+        ensureCsrfCookie(req, res);
         next();
+    });
+
+    app.use((req, res, next) => {
+        if (!req.path.startsWith('/api/')) return next();
+        if (!CSRF_METHODS.has(req.method)) return next();
+        if (req.path === '/api/login') return next();
+
+        const csrfHeader = req.get('x-csrf-token');
+        const csrfCookie = req.cookies?.[CSRF_COOKIE_NAME];
+        if (!csrfHeader || !csrfCookie || csrfHeader !== csrfCookie) {
+            return res.status(403).json({ error: 'Invalid CSRF token' });
+        }
+        return next();
     });
 
     app.use(express.static(path.join(process.cwd(), 'public')));
@@ -133,7 +190,7 @@ export function startServer() {
     });
 
     // Proxy Manager API
-    app.get('/api/proxies/manage', async (req, res) => {
+    app.get('/api/proxies/manage', requireAdmin, async (req, res) => {
         try {
             const { page = 1, limit = 50, search = '' } = req.query;
             const result = await ProxyService.getProxiesPaginated(page, limit, search);
@@ -143,11 +200,14 @@ export function startServer() {
         }
     });
 
-    app.post('/api/proxies/manage', async (req, res) => {
+    app.post('/api/proxies/manage', requireAdmin, async (req, res) => {
         try {
             const { proxies } = req.body;
             if (!proxies || !Array.isArray(proxies)) {
                 return res.status(400).json({ error: 'Invalid proxies format' });
+            }
+            if (proxies.length > ProxyService.maxBulkAdd) {
+                return res.status(413).json({ error: `Too many proxies. Limit is ${ProxyService.maxBulkAdd}.` });
             }
             const result = await ProxyService.bulkAddProxies(proxies);
             res.json(result);
@@ -156,13 +216,20 @@ export function startServer() {
         }
     });
 
-    app.delete('/api/proxies/manage', async (req, res) => {
+    app.delete('/api/proxies/manage', requireAdmin, async (req, res) => {
         try {
             const { ids } = req.body;
             if (!ids || !Array.isArray(ids)) {
                 return res.status(400).json({ error: 'Invalid IDs' });
             }
-            const result = await ProxyService.bulkDeleteProxies(ids);
+            if (ids.length > ProxyService.maxBulkDelete) {
+                return res.status(413).json({ error: `Too many IDs. Limit is ${ProxyService.maxBulkDelete}.` });
+            }
+            const validIds = ProxyService.filterValidProxyIds(ids);
+            if (validIds.length === 0) {
+                return res.status(400).json({ error: 'No valid IDs provided' });
+            }
+            const result = await ProxyService.bulkDeleteProxies(validIds);
             res.json(result);
         } catch (error) {
             res.status(500).json({ error: error.message });
@@ -417,7 +484,7 @@ export function startServer() {
         res.json({ success: true });
     });
 
-    app.post('/api/check-proxies', async (req, res) => {
+    app.post('/api/check-proxies', requireAdmin, async (req, res) => {
         try {
             // Trigger a reload from sources and DB
             await ProxyService.loadProxies();
@@ -430,7 +497,7 @@ export function startServer() {
         }
     });
 
-    app.post('/api/proxies/fetch', async (req, res) => {
+    app.post('/api/proxies/fetch', requireAdmin, async (req, res) => {
         try {
             await ProxyService.loadProxies();
             const stats = await ProxyService.getStats();
@@ -440,7 +507,7 @@ export function startServer() {
         }
     });
 
-    app.post('/api/proxies/refresh', async (req, res) => {
+    app.post('/api/proxies/refresh', requireAdmin, async (req, res) => {
         try {
             await ProxyService.refreshProxiesFromDB();
             const stats = await ProxyService.getStats();

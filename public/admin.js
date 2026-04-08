@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function loadTables() {
         try {
-            const response = await fetch('/api/db/tables');
+            const response = await apiFetch('/api/db/tables');
             const tables = await response.json();
 
             tableList.innerHTML = '';
@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
         resultsTable.querySelector('tbody').innerHTML = '';
 
         try {
-            const response = await fetch('/api/db/query', {
+            const response = await apiFetch('/api/db/query', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ sql })
@@ -81,7 +81,14 @@ document.addEventListener('DOMContentLoaded', () => {
         // Handle non-array results (e.g. from UPDATE/INSERT)
         if (!Array.isArray(results)) {
             thead.innerHTML = '<tr><th>Result</th></tr>';
-            tbody.innerHTML = `<tr><td><pre>${JSON.stringify(results, null, 2)}</pre></td></tr>`;
+            tbody.innerHTML = '';
+            const tr = document.createElement('tr');
+            const td = document.createElement('td');
+            const pre = document.createElement('pre');
+            pre.textContent = JSON.stringify(results, null, 2);
+            td.appendChild(pre);
+            tr.appendChild(td);
+            tbody.appendChild(tr);
             return;
         }
 

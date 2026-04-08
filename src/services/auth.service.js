@@ -2,12 +2,36 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { User } from '../db/models/User.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'floodgate_secret_key_change_me_please';
-const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+const DEFAULT_JWT_SECRET = 'floodgate_secret_key_change_me_please';
+const DEFAULT_ADMIN_USERNAME = 'admin';
+const DEFAULT_ADMIN_PASSWORD = 'admin123';
+
+const JWT_SECRET = process.env.JWT_SECRET || DEFAULT_JWT_SECRET;
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || DEFAULT_ADMIN_USERNAME;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || DEFAULT_ADMIN_PASSWORD;
+const IS_PROD = process.env.NODE_ENV === 'production';
 
 export const AuthService = {
+    assertSecureConfig() {
+        const usingDefaultJwt = JWT_SECRET === DEFAULT_JWT_SECRET;
+        const usingDefaultAdminPassword = ADMIN_PASSWORD === DEFAULT_ADMIN_PASSWORD;
+        const usingDefaultAdminUsername = ADMIN_USERNAME === DEFAULT_ADMIN_USERNAME;
+
+        if (!usingDefaultJwt && !usingDefaultAdminPassword && !usingDefaultAdminUsername) return;
+
+        const warnings = [];
+        if (usingDefaultJwt) warnings.push('JWT_SECRET');
+        if (usingDefaultAdminPassword) warnings.push('ADMIN_PASSWORD');
+        if (usingDefaultAdminUsername) warnings.push('ADMIN_USERNAME');
+
+        const message = `[Auth] Insecure defaults detected for ${warnings.join(', ')}. Set environment variables to secure values.`;
+        if (IS_PROD && (usingDefaultJwt || usingDefaultAdminPassword)) {
+            throw new Error(message);
+        }
+        console.warn(message);
+    },
     async initAdmin() {
+        this.assertSecureConfig();
         try {
             // Find user by username or ID 'admin'
             let admin = await User.findOne({ $or: [{ username: ADMIN_USERNAME }, { _id: 'admin' }] });

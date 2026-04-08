@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import axios from 'axios';
+import mongoose from 'mongoose';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import { SocksProxyAgent } from 'socks-proxy-agent';
 import { Proxy } from '../db/models/Proxy.js';
@@ -11,6 +12,11 @@ export const ProxyService = {
     currentIndex: 0,
     workingProxies: new Set(),
     agentCache: new Map(),
+    maxBulkAdd: 500,
+    maxBulkDelete: 500,
+    maxPageLimit: 200,
+    maxSearchLength: 64,
+    maxProxyLineLength: 200,
     
     // Configurable proxy sources
     proxySources: [
@@ -21,13 +27,23 @@ export const ProxyService = {
     ],
 
     async getProxiesPaginated(page = 1, limit = 50, search = '') {
-        const skip = (page - 1) * limit;
+        const parsedPage = parseInt(page, 10);
+        const parsedLimit = parseInt(limit, 10);
+        const safePage = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+        const safeLimit = Number.isFinite(parsedLimit) && parsedLimit > 0
+            ? Math.min(parsedLimit, this.maxPageLimit)
+            : 50;
+
+        const trimmedSearch = typeof search === 'string' ? search.trim() : '';
+        const safeSearch = trimmedSearch.slice(0, this.maxSearchLength);
+        const skip = (safePage - 1) * safeLimit;
         let query = {};
-        if (search) {
+        if (safeSearch) {
+            const escaped = this.escapeRegExp(safeSearch);
             query = {
                 $or: [
-                    { host: { $regex: search, $options: 'i' } },
-                    { type: { $regex: search, $options: 'i' } }
+                    { host: { $regex: escaped, $options: 'i' } },
+                    { type: { $regex: escaped, $options: 'i' } }
                 ]
             };
         }
@@ -35,21 +51,33 @@ export const ProxyService = {
         const proxies = await Proxy.find(query)
             .sort({ lastChecked: -1 })
             .skip(skip)
-            .limit(parseInt(limit));
+            .limit(safeLimit);
             
         const total = await Proxy.countDocuments(query);
         
         return {
             proxies,
             total,
-            page: parseInt(page),
-            totalPages: Math.ceil(total / limit)
+            page: safePage,
+            totalPages: Math.ceil(total / safeLimit)
         };
     },
 
     async bulkAddProxies(rawProxies) {
-        const parsedProxies = this.parseProxyLines(rawProxies);
-        if (parsedProxies.length === 0) return { count: 0 };
+        if (!Array.isArray(rawProxies)) {
+            return { count: 0, bannedCount: 0, invalidCount: 0, details: { upsertedCount: 0, modifiedCount: 0 } };
+        }
+
+        const trimmedLines = rawProxies
+            .filter(line => typeof line === 'string')
+            .map(line => line.trim())
+            .filter(line => line && !line.startsWith('#') && line.length <= this.maxProxyLineLength);
+
+        const parsedProxies = this.parseProxyLines(trimmedLines);
+        const invalidCount = Math.max(0, trimmedLines.length - parsedProxies.length);
+        if (parsedProxies.length === 0) {
+            return { count: 0, bannedCount: 0, invalidCount, details: { upsertedCount: 0, modifiedCount: 0 } };
+        }
 
         // Check against ban list
         const bannedChecks = parsedProxies.map(p => ({ host: p.host, port: p.port }));
@@ -60,7 +88,7 @@ export const ProxyService = {
         const bannedCount = parsedProxies.length - cleanProxies.length;
 
         if (cleanProxies.length === 0) {
-            return { count: 0, bannedCount, details: { upsertedCount: 0, modifiedCount: 0 } };
+            return { count: 0, bannedCount, invalidCount, details: { upsertedCount: 0, modifiedCount: 0 } };
         }
 
         const bulkOps = cleanProxies.map(p => ({
@@ -90,7 +118,7 @@ export const ProxyService = {
         }
 
         await this.refreshProxiesFromDB();
-        return { count: cleanProxies.length, bannedCount, details: result };
+        return { count: cleanProxies.length, bannedCount, invalidCount, details: result };
     },
 
     async bulkDeleteProxies(ids) {
@@ -231,22 +259,76 @@ export const ProxyService = {
     },
 
     parseProxyLines(lines) {
-        return lines
-            .map(line => line.trim())
-            .filter(line => line && !line.startsWith('#') && line.includes(':'))
+        return (Array.isArray(lines) ? lines : [])
+            .map(line => (typeof line === 'string' ? line.trim() : ''))
+            .filter(line => line && !line.startsWith('#') && line.includes(':') && line.length <= this.maxProxyLineLength)
             .map(line => {
                 const parts = line.split(':');
-                if (parts.length >= 2) {
+                if (parts.length !== 2 && parts.length !== 4) return null;
+
+                const host = parts[0].trim();
+                const port = Number(parts[1]);
+                if (!this.isValidHost(host) || !this.isValidPort(port)) return null;
+
+                if (parts.length === 4) {
+                    const user = parts[2].trim();
+                    const pass = parts[3].trim();
+                    if (!user || !pass) return null;
                     return {
-                        host: parts[0],
-                        port: parseInt(parts[1]),
-                        auth: parts.length >= 4 ? `${parts[2]}:${parts[3]}` : null,
-                        type: 'socks5' // Defaulting to socks5 based on the user's requested source
+                        host,
+                        port,
+                        auth: `${user}:${pass}`,
+                        type: 'socks5'
                     };
                 }
-                return null;
+
+                return {
+                    host,
+                    port,
+                    auth: null,
+                    type: 'socks5'
+                };
             })
             .filter(p => p !== null);
+    },
+
+    escapeRegExp(value) {
+        return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    },
+
+    isValidHost(host) {
+        return this.isValidIPv4(host) || this.isValidHostname(host);
+    },
+
+    isValidIPv4(host) {
+        const parts = host.split('.');
+        if (parts.length !== 4) return false;
+        return parts.every(part => {
+            if (!/^\d{1,3}$/.test(part)) return false;
+            const value = Number(part);
+            return value >= 0 && value <= 255;
+        });
+    },
+
+    isValidHostname(host) {
+        if (!host || host.length > 253) return false;
+        if (!/^[a-zA-Z0-9.-]+$/.test(host)) return false;
+
+        const labels = host.split('.');
+        return labels.every(label => {
+            if (!label || label.length > 63) return false;
+            if (label.startsWith('-') || label.endsWith('-')) return false;
+            return true;
+        });
+    },
+
+    isValidPort(port) {
+        return Number.isInteger(port) && port > 0 && port <= 65535;
+    },
+
+    filterValidProxyIds(ids) {
+        if (!Array.isArray(ids)) return [];
+        return ids.filter(id => mongoose.Types.ObjectId.isValid(id));
     },
 
     saveProxiesToFile() {

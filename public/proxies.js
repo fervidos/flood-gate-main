@@ -160,7 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!confirmed) return;
 
         try {
-            const response = await fetch('/api/proxies/manage', {
+            const response = await apiFetch('/api/proxies/manage', {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ids: Array.from(selectedProxies) })
@@ -215,7 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btnConfirmAdd.disabled = true;
 
         try {
-            const response = await fetch('/api/proxies/manage', {
+            const response = await apiFetch('/api/proxies/manage', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ proxies })
@@ -224,11 +224,30 @@ document.addEventListener('DOMContentLoaded', () => {
             const result = await response.json();
             
             if (response.ok) {
-                let msg = `Successfully added ${result.details.upsertedCount} new proxies and updated ${result.details.modifiedCount}.`;
-                if (result.bannedCount > 0) {
-                    msg += ` <br><span class="text-warning">⚠️ Skipped ${result.bannedCount} banned proxies.</span>`;
+                const upsertedCount = result?.details?.upsertedCount ?? 0;
+                const modifiedCount = result?.details?.modifiedCount ?? 0;
+                const bannedCount = result?.bannedCount ?? 0;
+                const invalidCount = result?.invalidCount ?? 0;
+
+                addResult.textContent = '';
+                const summary = document.createElement('div');
+                summary.textContent = `Successfully added ${upsertedCount} new proxies and updated ${modifiedCount}.`;
+                addResult.appendChild(summary);
+
+                if (bannedCount > 0) {
+                    const bannedNote = document.createElement('div');
+                    bannedNote.className = 'text-warning';
+                    bannedNote.textContent = `Skipped ${bannedCount} banned proxies.`;
+                    addResult.appendChild(bannedNote);
                 }
-                addResult.innerHTML = msg;
+
+                if (invalidCount > 0) {
+                    const invalidNote = document.createElement('div');
+                    invalidNote.className = 'text-warning';
+                    invalidNote.textContent = `Skipped ${invalidCount} invalid entries.`;
+                    addResult.appendChild(invalidNote);
+                }
+
                 addResult.className = 'text-success';
                 showToast('Proxies updated successfully.', 'success');
                 setTimeout(() => {
@@ -259,7 +278,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 search: currentSearch
             });
             
-            const response = await fetch(`/api/proxies/manage?${params}`);
+            const response = await apiFetch(`/api/proxies/manage?${params}`);
+            if (!response.ok) {
+                throw new Error('Failed to fetch proxies');
+            }
             const data = await response.json();
             
             renderTable(data.proxies);
@@ -290,24 +312,61 @@ document.addEventListener('DOMContentLoaded', () => {
             const isWorking = proxy.isWorking && (!proxy.timeoutUntil || new Date(proxy.timeoutUntil) < new Date());
             const statusClass = isWorking ? 'status-working' : 'status-failed';
             const statusText = isWorking ? 'Working' : 'Failed/Timeout';
-            const lastChecked = new Date(proxy.lastChecked).toLocaleString();
+            const lastCheckedDate = proxy.lastChecked ? new Date(proxy.lastChecked) : null;
+            const lastChecked = lastCheckedDate && !Number.isNaN(lastCheckedDate.getTime())
+                ? lastCheckedDate.toLocaleString()
+                : 'N/A';
 
-            tr.innerHTML = `
-                <td><input type="checkbox" class="proxy-checkbox" value="${proxy._id}"></td>
-                <td>${proxy.host}</td>
-                <td>${proxy.port}</td>
-                <td><span class="status-badge" style="background:var(--bg-secondary); color:var(--text-muted)">${proxy.type}</span></td>
-                <td>${proxy.auth ? 'Yes' : 'No'}</td>
-                <td><span class="status-badge ${statusClass}">${statusText}</span></td>
-                <td>${proxy.failCount}</td>
-                <td style="font-size:0.8em; color:var(--text-muted)">${lastChecked}</td>
-            `;
+            const checkboxCell = document.createElement('td');
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'proxy-checkbox';
+            checkbox.value = proxy._id;
+            checkboxCell.appendChild(checkbox);
+            tr.appendChild(checkboxCell);
+
+            const hostCell = document.createElement('td');
+            hostCell.textContent = proxy.host || '';
+            tr.appendChild(hostCell);
+
+            const portCell = document.createElement('td');
+            portCell.textContent = proxy.port !== undefined ? String(proxy.port) : '';
+            tr.appendChild(portCell);
+
+            const typeCell = document.createElement('td');
+            const typeBadge = document.createElement('span');
+            typeBadge.className = 'status-badge';
+            typeBadge.style.background = 'var(--bg-secondary)';
+            typeBadge.style.color = 'var(--text-muted)';
+            typeBadge.textContent = proxy.type || '';
+            typeCell.appendChild(typeBadge);
+            tr.appendChild(typeCell);
+
+            const authCell = document.createElement('td');
+            authCell.textContent = proxy.auth ? 'Yes' : 'No';
+            tr.appendChild(authCell);
+
+            const statusCell = document.createElement('td');
+            const statusBadge = document.createElement('span');
+            statusBadge.className = `status-badge ${statusClass}`;
+            statusBadge.textContent = statusText;
+            statusCell.appendChild(statusBadge);
+            tr.appendChild(statusCell);
+
+            const failCell = document.createElement('td');
+            failCell.textContent = String(proxy.failCount ?? 0);
+            tr.appendChild(failCell);
+
+            const lastCheckedCell = document.createElement('td');
+            lastCheckedCell.style.fontSize = '0.8em';
+            lastCheckedCell.style.color = 'var(--text-muted)';
+            lastCheckedCell.textContent = lastChecked;
+            tr.appendChild(lastCheckedCell);
             
             // Re-check if selected (persisting selection within page view, though I cleared it on fetch)
             // If I wanted to persist selection across pages, I'd need to not clear selectedProxies in fetchProxies
             // But for now, clearing is safer.
             
-            const checkbox = tr.querySelector('.proxy-checkbox');
             checkbox.addEventListener('change', (e) => {
                 if (e.target.checked) {
                     selectedProxies.add(proxy._id);
